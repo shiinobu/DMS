@@ -2,19 +2,15 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-
-const API_URL =
-    process.env.NEXT_PUBLIC_API_URL ||
-    "http://localhost:8080/api/v1";
+import { login } from "@/lib/api";
 
 export default function LoginPage() {
-    const router = useRouter();
-
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
-
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+
+    const router = useRouter();
 
     async function handleSubmit(
         event: FormEvent<HTMLFormElement>
@@ -25,36 +21,19 @@ export default function LoginPage() {
         setError("");
 
         try {
-            const response = await fetch(
-                `${API_URL}/auth/login`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        username,
-                        password,
-                    }),
-                }
+            const result = await login(
+                username,
+                password
             );
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    result.message || "Login failed"
-                );
-            }
 
             localStorage.setItem(
                 "access_token",
-                result.data.token
+                result.token
             );
 
             localStorage.setItem(
                 "user",
-                JSON.stringify(result.data.user)
+                JSON.stringify(result.user)
             );
 
             router.push("/dashboard");
@@ -75,7 +54,6 @@ export default function LoginPage() {
                 <h1 className="text-2xl font-bold">
                     DMS Login
                 </h1>
-
                 <p className="mt-2 text-sm text-gray-500">
                     Device Management System
                 </p>
@@ -94,7 +72,6 @@ export default function LoginPage() {
                         <label className="mb-1 block text-sm font-medium">
                             Username
                         </label>
-
                         <input
                             type="text"
                             value={username}
@@ -106,12 +83,10 @@ export default function LoginPage() {
                             required
                         />
                     </div>
-
                     <div>
                         <label className="mb-1 block text-sm font-medium">
                             Password
                         </label>
-
                         <input
                             type="password"
                             value={password}
@@ -123,7 +98,6 @@ export default function LoginPage() {
                             required
                         />
                     </div>
-
                     <button
                         type="submit"
                         disabled={loading}

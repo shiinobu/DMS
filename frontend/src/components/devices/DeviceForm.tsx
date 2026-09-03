@@ -45,14 +45,13 @@ export default function DeviceForm({
                 device_id: device.device_id,
                 device_name: device.device_name,
                 serial_number: device.serial_number,
-                os_version: device.os_version || "",
-                ip_address: device.ip_address || "",
-                location: device.location || "",
+                os_version: device.os_version ?? "",
+                ip_address: device.ip_address ?? "",
+                location: device.location ?? "",
             });
         } else {
             setForm(emptyForm);
         }
-
         setError("");
     }, [device]);
 
@@ -65,7 +64,6 @@ export default function DeviceForm({
             [field]: value,
         }));
     }
-
     async function handleSubmit(
         event: FormEvent<HTMLFormElement>
     ) {
@@ -79,11 +77,10 @@ export default function DeviceForm({
                 device_id: form.device_id,
                 device_name: form.device_name,
                 serial_number: form.serial_number,
-                os_version: form.os_version || null,
-                ip_address: form.ip_address || null,
-                location: form.location || null,
+                os_version: form.os_version ?? null,
+                ip_address: form.ip_address ?? null,
+                location: form.location ?? null,
             };
-
             if (isEdit) {
                 await apiFetch(
                     `/devices/${encodeURIComponent(form.device_id)}`,
@@ -98,7 +95,6 @@ export default function DeviceForm({
                     body: JSON.stringify(payload),
                 });
             }
-
             onSuccess();
         } catch (error) {
             setError(
@@ -117,7 +113,6 @@ export default function DeviceForm({
                 <h2 className="text-xl font-semibold">
                     {isEdit ? "Edit Device" : "Add Device"}
                 </h2>
-
                 <p className="mt-1 text-sm text-gray-500">
                     {isEdit
                         ? "Update device information."
@@ -133,11 +128,12 @@ export default function DeviceForm({
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <label className="mb-1 block text-sm font-medium">
+                    <label htmlFor="device_id" className="mb-1 block text-sm font-medium">
                         Device ID
                     </label>
-
                     <input
+                        id="device_id"
+                        name="device_id"
                         type="text"
                         value={form.device_id}
                         onChange={(event) =>
@@ -149,13 +145,13 @@ export default function DeviceForm({
                         placeholder="DMS-006"
                     />
                 </div>
-
                 <div>
-                    <label className="mb-1 block text-sm font-medium">
+                    <label htmlFor="device_name" className="mb-1 block text-sm font-medium">
                         Device Name
                     </label>
-
                     <input
+                        id="device_name"
+                        name="device_name"
                         type="text"
                         value={form.device_name}
                         onChange={(event) =>
@@ -166,13 +162,13 @@ export default function DeviceForm({
                         placeholder="Office PC 006"
                     />
                 </div>
-
                 <div>
-                    <label className="mb-1 block text-sm font-medium">
+                    <label htmlFor="serial_number" className="mb-1 block text-sm font-medium">
                         Serial Number
                     </label>
-
                     <input
+                        id="serial_number"
+                        name="serial_number"
                         type="text"
                         value={form.serial_number}
                         onChange={(event) =>
@@ -183,13 +179,13 @@ export default function DeviceForm({
                         placeholder="SN-DMS-006"
                     />
                 </div>
-
                 <div>
-                    <label className="mb-1 block text-sm font-medium">
+                    <label htmlFor="os_version" className="mb-1 block text-sm font-medium">
                         OS Version
                     </label>
-
                     <input
+                        id="os_version"
+                        name="os_version"
                         type="text"
                         value={form.os_version}
                         onChange={(event) =>
@@ -199,13 +195,13 @@ export default function DeviceForm({
                         placeholder="Windows 11 Pro"
                     />
                 </div>
-
                 <div>
-                    <label className="mb-1 block text-sm font-medium">
+                    <label htmlFor="ip_address" className="mb-1 block text-sm font-medium">
                         IP Address
                     </label>
-
                     <input
+                        id="ip_address"
+                        name="ip_address"
                         type="text"
                         value={form.ip_address}
                         onChange={(event) =>
@@ -215,13 +211,13 @@ export default function DeviceForm({
                         placeholder="192.168.1.106"
                     />
                 </div>
-
                 <div>
-                    <label className="mb-1 block text-sm font-medium">
+                    <label htmlFor="location" className="mb-1 block text-sm font-medium">
                         Location
                     </label>
-
                     <input
+                        id="location"
+                        name="location"
                         type="text"
                         value={form.location}
                         onChange={(event) =>
@@ -231,27 +227,21 @@ export default function DeviceForm({
                         placeholder="Office - Floor 2"
                     />
                 </div>
-
-                <div className="flex gap-3 pt-2">
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="rounded-lg bg-black px-4 py-2 text-white disabled:opacity-50"
-                    >
-                        {loading
-                            ? "Saving..."
-                            : isEdit
-                                ? "Update Device"
-                                : "Create Device"}
-                    </button>
-
+                <div className="mt-6 flex items-center justify-between">
                     <button
                         type="button"
                         onClick={onCancel}
                         disabled={loading}
-                        className="rounded-lg border px-4 py-2"
+                        className="rounded-lg px-5 py-2.5 text-sm font-semibold text-gray-700 border border-gray-300 shadow-sm transition hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 cursor-pointer"
                     >
-                        Cancel
+                        CANCEL
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 cursor-pointer"
+                    >
+                        {loading ? "SAVING..." : isEdit ? "UPDATE" : "CREATE"}
                     </button>
                 </div>
             </form>

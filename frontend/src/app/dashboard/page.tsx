@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Device, DeviceStatusChangedEvent } from "@/types/device";
-import { apiFetch, ApiResponse } from "@/lib/api";
+import { NotificationItem } from "@/types/notification";
+import { apiFetch, apiDownload, ApiResponse } from "@/lib/api";
 import { connectWebSocket } from "@/lib/websocket";
 import { ReportSummary } from "@/types/report";
 
@@ -14,59 +15,6 @@ import Notification from "@/components/notifications/Notification";
 
 type ModalType = "create" | "edit" | "delete" | null;
 
-async function handleExportCSV() {
-    try {
-        const token =
-            localStorage.getItem(
-                "access_token"
-            );
-
-        const response = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/reports/devices/export`,
-            {
-                method: "GET",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error(
-                "Failed to export devices"
-            );
-        }
-
-        const blob = await response.blob();
-
-        const url = window.URL.createObjectURL(
-            blob
-        );
-
-        const link =
-            document.createElement("a");
-
-        link.href = url;
-        link.download =
-            `dms-devices-${new Date()
-                .toISOString()
-                .slice(0, 10)}.csv`;
-
-        document.body.appendChild(link);
-
-        link.click();
-
-        link.remove();
-
-        window.URL.revokeObjectURL(url);
-    } catch (error) {
-        console.error(
-            "Export failed:",
-            error
-        );
-    }
-}
-
 export default function DashboardPage() {
     const router = useRouter();
     const [devices, setDevices] = useState<Device[]>([]);
@@ -74,32 +22,28 @@ export default function DashboardPage() {
     const [error, setError] = useState("");
     const [modal, setModal] = useState<ModalType>(null);
     const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
-    const [notification, setNotification] = useState<DeviceStatusChangedEvent | null>(null);
     const [report, setReport] = useState<ReportSummary | null>(null);
+    const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+
+    const total = devices.length;
+    const online = devices.filter((device) => device.status === "ONLINE").length;
+    const offline = devices.filter((device) => device.status === "OFFLINE").length;
 
     const loadDevices = useCallback(async () => {
         try {
             setLoading(true);
             setError("");
-            const result = await apiFetch<{
-                success: boolean;
-                data: Device[];
-            }>("/devices");
-            setDevices(result.data || []);
+            const result = await apiFetch<ApiResponse<Device[]>>("/devices");
+            setDevices(result.data);
         } catch (error) {
             setError(error instanceof Error ? error.message : "Failed to load devices");
         } finally {
             setLoading(false);
         }
-    },
-        []
-    );
-
-    async function loadReport() {
+    }, []);
+    const loadReport = useCallback(async () => {
         try {
-            const result = await apiFetch<ApiResponse<ReportSummary>
-            >("/reports/summary");
-
+            const result = await apiFetch<ApiResponse<ReportSummary>>("/reports/summary");
             setReport(result.data);
         } catch (error) {
             console.error(
@@ -107,36 +51,47 @@ export default function DashboardPage() {
                 error
             );
         }
-    }
-
-    const handleDeviceStatusChanged = (
-        event: DeviceStatusChangedEvent
-    ) => {
-        setDevices((current) =>
-            current.map((device) => device.device_id === event.device_id ? event.device : device)
+    }, []);
+    const handleDeviceStatusChanged = useCallback(
+        (event: DeviceStatusChangedEvent) => {
+            setDevices((current) =>
+                current.map((device) =>
+                    device.device_id === event.device_id ? {
+                        ...device,
+                        status: event.status,
+                    } : device
+                )
+            );
+            setNotifications((current) => [
+                ...current,
+                {
+                    id: crypto.randomUUID(),
+                    event,
+                },
+            ]);
+            loadReport();
+        },
+        [loadReport]
+    );
+    const removeNotification = useCallback((id: string) => {
+        setNotifications((current) =>
+            current.filter(
+                (notification) =>
+                    notification.id !== id
+            )
         );
-        setNotification(event);
-        loadReport();
-    };
+    }, []);
 
     useEffect(() => {
-        const accessToken = localStorage.getItem("access_token");
-        if (!accessToken) {
-            router.push("/login");
-            return;
-        }
         loadDevices();
-    }, [router, loadDevices]);
-
-    useEffect(() => {
+        loadReport();
         const disconnect = connectWebSocket(
             handleDeviceStatusChanged
         );
-
         return () => {
             disconnect();
         };
-    }, []);
+    }, [loadDevices, loadReport, handleDeviceStatusChanged]);
 
     function openCreateModal() {
         setSelectedDevice(null);
@@ -158,45 +113,61 @@ export default function DashboardPage() {
         setSelectedDevice(null);
     }
 
-    async function handleSuccess() {
-        closeModal();
-        await loadDevices();
-    }
-
     function handleLogout() {
         localStorage.removeItem("access_token");
         localStorage.removeItem("user");
-
         router.replace("/login");
     }
 
-    const total = devices.length;
+    async function handleSuccess() {
+        closeModal();
+        await Promise.all([
+            loadDevices(), 
+            loadReport()
+        ]);
+    }
+    async function handleExportCSV() {
+        try {
+            const blob = await apiDownload(
+                "/reports/devices/export"
+            );
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
 
-    const online = devices.filter(
-        (device) => device.status === "ONLINE"
-    ).length;
+            link.href = url;
+            link.download = `dms-devices-${new Date().toISOString().slice(0, 10)}.csv`;
 
-    const offline = devices.filter(
-        (device) => device.status === "OFFLINE"
-    ).length;
+            document.body.appendChild(link);
+
+            link.click();
+            link.remove();
+
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error(
+                "Export failed:",
+                error
+            );
+        }
+    }
 
     return (
         <main className="min-h-screen bg-gray-400">
-            <Notification event={notification} onClose={() => setNotification(null)} />
+            <Notification notifications={notifications} onClose={removeNotification} />
             <header className="border-b bg-white">
                 <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
                     <div>
                         <h1 className="text-xl font-bold">
                             Device Management System
                         </h1>
-                        <p className="text-sm">
+                        <p className="text-md text-gray-700">
                             Dashboard
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
                         <button
                             type="button" onClick={handleExportCSV}
-                            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-300 hover:bg-gray-50 hover:shadow-md active:translate-y-0">
+                            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-green-200 hover:bg-green-50 hover:text-green-600 hover:shadow-md active:translate-y-0">
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
                                 fill="none"
@@ -237,93 +208,124 @@ export default function DashboardPage() {
             </header>
             <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    {/* Total Device */}
                     <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
                         <div className="flex items-center gap-2">
                             <span className="h-4 w-4 rounded-full bg-gray-400" />
-                            <p className="text-lg font-bold uppercase">
-                                Device
+                            <p className="text-lg font-bold">
+                                DEVICE
                             </p>
                         </div>
                         <p className="text-2xl font-bold text-gray-900">
                             {total}
                         </p>
                     </div>
-                    {/* Online */}
                     <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
                         <div className="flex items-center gap-2">
                             <span className="h-4 w-4 rounded-full bg-green-500" />
-                            <p className="text-lg font-bold uppercase">
-                                Online
+                            <p className="text-lg font-bold">
+                                ONLINE
                             </p>
                         </div>
                         <p className="text-2xl font-bold text-green-600">
                             {online}
                         </p>
                     </div>
-                    {/* Offline */}
                     <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
                         <div className="flex items-center gap-2">
                             <span className="h-4 w-4 rounded-full bg-red-500" />
-                            <p className="text-lg font-bold uppercase">
-                                Offline
+                            <p className="text-lg font-bold">
+                                OFFLINE
                             </p>
                         </div>
                         <p className="text-2xl font-bold text-red-600">
                             {offline}
                         </p>
                     </div>
-                    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                        <p className="text-sm font-medium text-gray-600">
-                            Last Online
-                        </p>
-                        {report?.last_online ? (
-                            <div className="mt-3">
-                                <p className="font-semibold text-gray-900">
-                                    {report.last_online.device_id}
-                                </p>
-
-                                <p className="text-sm text-gray-500">
-                                    {report.last_online.device_name}
-                                </p>
-
-                                <p className="mt-1 text-xs text-gray-400">
-                                    {new Date(
-                                        report.last_online.last_online_at
-                                    ).toLocaleString()}
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+                        <div className="flex items-center gap-5">
+                            <div className="flex shrink-0 items-center gap-2">
+                                <p className="text-xl font-bold">
+                                    LAST ONLINE
                                 </p>
                             </div>
-                        ) : (
-                            <p className="mt-3 text-sm text-gray-400">
-                                No data
-                            </p>
-                        )}
+                            {report?.last_online ? (
+                                <div className="ml-auto min-w-0 text-right">
+                                    <p className="text-md font-semibold">
+                                        {report.last_online.device_id}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                        {report.last_online.device_name}
+                                    </p>
+                                    <p className="mt-1 text-[11px] text-gray-400">
+                                        {new Date(
+                                            report.last_online.last_online_at
+                                        ).toLocaleDateString("id-ID", {
+                                            day: "numeric",
+                                            month: "short",
+                                            year: "numeric",
+                                            timeZone: "Asia/Jakarta",
+                                        })}{" • "}
+                                        {new Date(
+                                            report.last_online.last_online_at
+                                        ).toLocaleTimeString("en-US", {
+                                            hour: "numeric",
+                                            minute: "2-digit",
+                                            second: "2-digit",
+                                            hour12: true,
+                                            timeZone: "Asia/Jakarta",
+                                        })}
+                                    </p>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-gray-400">
+                                    No data
+                                </p>
+                            )}
+                        </div>
                     </div>
-                    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                        <p className="text-sm font-medium text-gray-600">
-                            Last Offline
-                        </p>
-                        {report?.last_offline ? (
-                            <div className="mt-3">
-                                <p className="font-semibold text-gray-900">
-                                    {report.last_offline.device_id}
-                                </p>
-
-                                <p className="text-sm text-gray-500">
-                                    {report.last_offline.device_name}
-                                </p>
-
-                                <p className="mt-1 text-xs text-gray-400">
-                                    {new Date(
-                                        report.last_offline.last_offline_at
-                                    ).toLocaleString()}
+                    <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+                        <div className="flex items-center gap-5">
+                            <div className="flex shrink-0 items-center gap-2">
+                                <p className="text-xl font-bold">
+                                    LAST OFFLINE
                                 </p>
                             </div>
-                        ) : (
-                            <p className="mt-3 text-sm text-gray-400">
-                                No data
-                            </p>
-                        )}
+                            {report?.last_offline ? (
+                                <div className="ml-auto min-w-0 text-right">
+                                    <p className="text-md font-semibold">
+                                        {report.last_offline.device_id}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                        {report.last_offline.device_name}
+                                    </p>
+                                    <p className="mt-1 text-[11px] text-gray-400">
+                                        {new Date(
+                                            report.last_offline.last_offline_at
+                                        ).toLocaleDateString("id-ID", {
+                                            day: "numeric",
+                                            month: "short",
+                                            year: "numeric",
+                                            timeZone: "Asia/Jakarta",
+                                        })}{" • "}
+                                        {new Date(
+                                            report.last_offline.last_offline_at
+                                        ).toLocaleTimeString("en-US", {
+                                            hour: "numeric",
+                                            minute: "2-digit",
+                                            second: "2-digit",
+                                            hour12: true,
+                                            timeZone: "Asia/Jakarta",
+                                        })}
+                                    </p>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-gray-400">
+                                    No data
+                                </p>
+                            )}
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center justify-between">
@@ -332,14 +334,28 @@ export default function DashboardPage() {
                             Devices
                         </h2>
                         <p className="text-sm">
-                            Manage registered devices.
+                            Manage registered devices
                         </p>
                     </div>
                     <button
                         onClick={openCreateModal}
-                        className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white cursor-pointer"
+                        className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gray-900 px-8 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-gray-800 hover:shadow-md active:translate-y-0"
                     >
-                        + Add Device
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth="2"
+                            stroke="currentColor"
+                            className="h-4 w-4"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M12 4.5v15m7.5-7.5h-15"
+                            />
+                        </svg>
+                        ADD
                     </button>
                 </div>
 
@@ -361,6 +377,7 @@ export default function DashboardPage() {
                     />
                 )}
             </div>
+
             {modal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6">
                     <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto">
@@ -389,6 +406,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
             )}
+            
         </main>
     );
 }

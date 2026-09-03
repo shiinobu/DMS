@@ -1,12 +1,9 @@
 "use client";
 
-import {
-    DeviceStatusChangedEvent,
-} from "@/types/device";
+import { DeviceStatusChangedEvent } from "@/types/device";
 
-const WS_URL =
-    process.env.NEXT_PUBLIC_WS_URL ||
-    "ws://localhost:8080/api/v1/ws";
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080/api/v1/ws";
+const RECONNECT_DELAY = 3000;
 
 export function connectWebSocket(
     onMessage: (
@@ -17,11 +14,7 @@ export function connectWebSocket(
     ) => void
 ) {
     let socket: WebSocket | null = null;
-
-    let reconnectTimer:
-        ReturnType<typeof setTimeout> | null =
-        null;
-
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let stopped = false;
 
     function connect() {
@@ -32,20 +25,14 @@ export function connectWebSocket(
         socket = new WebSocket(WS_URL);
 
         socket.onopen = () => {
-            console.log(
-                "WebSocket connected"
-            );
-
             onConnectionChange?.(true);
         };
 
         socket.onmessage = (message) => {
             try {
-                const event =
-                    JSON.parse(
-                        message.data
-                    ) as DeviceStatusChangedEvent;
-
+                const event = JSON.parse(
+                    message.data
+                ) as DeviceStatusChangedEvent;
                 if (
                     event.type ===
                     "DEVICE_STATUS_CHANGED"
@@ -61,40 +48,29 @@ export function connectWebSocket(
         };
 
         socket.onclose = () => {
-            console.log(
-                "WebSocket disconnected"
-            );
-
             onConnectionChange?.(false);
 
             if (!stopped) {
                 reconnectTimer =
                     setTimeout(
                         connect,
-                        3000
+                        RECONNECT_DELAY
                     );
             }
         };
 
-        socket.onerror = (error) => {
-            console.log(
-                "WebSocket error:",
-                error
-            );
-        };
+        socket.onerror = () => {};
     }
 
     connect();
 
     return () => {
         stopped = true;
-
         if (reconnectTimer) {
-            clearTimeout(
-                reconnectTimer
-            );
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
         }
-
         socket?.close();
+        socket = null;
     };
 }
