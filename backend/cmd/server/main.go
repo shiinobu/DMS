@@ -3,7 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"dms/backend/internal/config"
 	"dms/backend/internal/database"
@@ -20,21 +26,25 @@ import (
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatal("failed to load config:", err)
+		log.Fatalf(
+			"Failed to Load Config: %v",
+			err,
+		)
 	}
 
 	db, err := database.NewPostgresPool(cfg)
 	if err != nil {
-		log.Fatal("failed to connect database:", err)
+		log.Fatalf(
+			"Failed to Connect Database: %v",
+			err,
+		)
 	}
 	defer db.Close()
 
-	// Repository
 	deviceRepository := repositories.NewDeviceRepository(db)
 	userRepository := repositories.NewUserRepository(db)
 	reportRepository := repositories.NewReportRepository(db)
 
-	// Service
 	deviceService := services.NewDeviceService(
 		deviceRepository,
 	)
@@ -52,7 +62,6 @@ func main() {
 		cfg.StatusCheckInterval,
 	)
 
-	// Handler
 	deviceHandler := handlers.NewDeviceHandler(
 		deviceService,
 	)
@@ -62,52 +71,13 @@ func main() {
 	)
 	healthHandler := handlers.NewHealthHandler(db)
 
-	// Start status monitor in background
-	go statusMonitor.Start(context.Background())
-
-	// WebSocket hub
 	hub := websocket.NewHub()
 	go hub.Run()
-
-	go func() {
-		for event := range deviceService.StatusChanged() {
-
-			message, err := json.Marshal(event)
-
-			if err != nil {
-				log.Println(
-					"failed to marshal device event:",
-					err,
-				)
-
-				continue
-			}
-
-			hub.Broadcast(message)
-		}
-
-	}()
-
-	go func() {
-		for event := range statusMonitor.StatusChanged() {
-
-			message, err := json.Marshal(event)
-
-			if err != nil {
-				log.Println(
-					"failed to marshal device status event:",
-					err,
-				)
-
-				continue
-			}
-
-			hub.Broadcast(message)
-		}
-
-	}()
+	go broadcastEvents(hub, deviceService.StatusChanged())
+	go broadcastEvents(hub, statusMonitor.StatusChanged())
 
 	router := gin.Default()
+
 	router.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
 			cfg.CORSOrigin,
@@ -132,12 +102,9 @@ func main() {
 
 	api := router.Group("/api/v1")
 	api.GET("/ws", websocket.Handler(hub))
-
-	// Public authentication
 	api.POST("/auth/login", authHandler.Login)
 	api.POST("/devices/:device_id/heartbeat", deviceHandler.Heartbeat)
 
-	// Protected routes
 	protected := api.Group("")
 	protected.Use(middleware.JWTAuth(cfg.JWTSecret))
 	protected.Use(middleware.AdminOnly())
@@ -157,12 +124,74 @@ func main() {
 		reports.GET("/devices/export", reportHandler.ExportDevices)
 	}
 
-	log.Printf(
-		"DMS backend running on :%s",
-		cfg.AppPort,
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
 	)
+	defer stop()
 
-	if err := router.Run(":" + cfg.AppPort); err != nil {
-		log.Fatal(err)
+	go statusMonitor.Start(ctx)
+
+	server := &http.Server{
+		Addr:    ":" + cfg.AppPort,
+		Handler: router,
+	}
+
+	serverErr := make(chan error, 1)
+
+	go func() {
+		log.Printf(
+			"DMS Backend Running on :%s",
+			cfg.AppPort,
+		)
+
+		serverErr <- server.ListenAndServe()
+	}()
+
+	select {
+	case err := <-serverErr:
+		if !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf(
+				"HTTP server failed: %v",
+				err,
+			)
+		}
+
+	case <-ctx.Done():
+		log.Println(
+			"Shutting Down DMS Backend",
+		)
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(
+		context.Background(),
+		5*time.Second,
+	)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf(
+			"Failed to Shutdown HTTP Server: %v",
+			err,
+		)
+	}
+}
+
+func broadcastEvents(
+	hub *websocket.Hub,
+	events <-chan services.DeviceStatusChangedEvent,
+) {
+	for event := range events {
+		message, err := json.Marshal(event)
+		if err != nil {
+			log.Printf(
+				"Failed to Marshal Device Status Event: %v",
+				err,
+			)
+			continue
+		}
+
+		hub.Broadcast(message)
 	}
 }

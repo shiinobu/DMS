@@ -9,60 +9,42 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	contextUserID   = "user_id"
+	contextUsername = "username"
+	contextRole     = "role"
+	roleAdmin = "ADMIN"
+)
+
 func JWTAuth(secret string) gin.HandlerFunc {
-
 	return func(c *gin.Context) {
+		header := c.GetHeader("Authorization")
 
-		authHeader := c.GetHeader("Authorization")
-
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"success": false,
-				"message": "authorization header is required",
-			})
-
-			c.Abort()
+		if header == "" {
+			unauthorized(c, "authorization header is required")
 			return
 		}
 
-		parts := strings.SplitN(
-			authHeader,
-			" ",
-			2,
-		)
+		parts := strings.SplitN(header, " ", 2)
 
 		if len(parts) != 2 ||
 			!strings.EqualFold(parts[0], "Bearer") {
-
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"success": false,
-				"message": "invalid authorization header",
-			})
-
-			c.Abort()
+			unauthorized(c, "invalid authorization header")
 			return
 		}
-
-		tokenString := parts[1]
 
 		claims, err := auth.ParseToken(
-			tokenString,
+			parts[1],
 			secret,
 		)
-
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"success": false,
-				"message": "invalid or expired token",
-			})
-
-			c.Abort()
+			unauthorized(c, "invalid or expired token")
 			return
 		}
 
-		c.Set("user_id", claims.UserID)
-		c.Set("username", claims.Username)
-		c.Set("role", claims.Role)
+		c.Set(contextUserID, claims.UserID)
+		c.Set(contextUsername, claims.Username)
+		c.Set(contextRole, claims.Role)
 
 		c.Next()
 	}
@@ -70,29 +52,37 @@ func JWTAuth(secret string) gin.HandlerFunc {
 
 func AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		roleValue, exists := c.Get("role")
-		if !exists {
-			c.JSON(http.StatusForbidden, gin.H{
-				"success": false,
-				"message": "role information is missing",
-			})
+		role, exists := c.Get(contextRole)
 
-			c.Abort()
+		if !exists {
+			unauthorized(c, "authentication required")
 			return
 		}
 
-		role, ok := roleValue.(string)
-
-		if !ok || role != "ADMIN" {
-			c.JSON(http.StatusForbidden, gin.H{
-				"success": false,
-				"message": "admin access required",
-			})
-
-			c.Abort()
+		if role != roleAdmin {
+			c.AbortWithStatusJSON(
+				http.StatusForbidden,
+				gin.H{
+					"success": false,
+					"message": "admin access required",
+				},
+			)
 			return
 		}
 
 		c.Next()
 	}
+}
+
+func unauthorized(
+	c *gin.Context,
+	message string,
+) {
+	c.AbortWithStatusJSON(
+		http.StatusUnauthorized,
+		gin.H{
+			"success": false,
+			"message": message,
+		},
+	)
 }

@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"encoding/csv"
+	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -9,6 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+const reportTimezone = "Asia/Jakarta"
 
 type ReportHandler struct {
 	service services.ReportService
@@ -74,7 +78,7 @@ func (h *ReportHandler) GetSummary(
 func (h *ReportHandler) ExportDevices(
 	c *gin.Context,
 ) {
-	location, err := time.LoadLocation("Asia/Jakarta")
+	location, err := time.LoadLocation(reportTimezone)
 	if err != nil {
 		c.JSON(
 			http.StatusInternalServerError,
@@ -101,9 +105,8 @@ func (h *ReportHandler) ExportDevices(
 		return
 	}
 
-	filename := "dms-devices-" +
-		time.Now().Format("2006-01-02") +
-		".csv"
+	now := time.Now().In(location)
+	filename := fmt.Sprintf("devices-%s.csv", now.Format("20060102-150405"))
 
 	c.Header(
 		"Content-Type",
@@ -119,6 +122,10 @@ func (h *ReportHandler) ExportDevices(
 
 	writer := csv.NewWriter(c.Writer)
 	defer writer.Flush()
+
+	if err := writer.Error(); err != nil {
+		log.Printf("Failed to Write CSV Response: %v", err)
+	}
 
 	err = writer.Write([]string{
 		"Device ID",

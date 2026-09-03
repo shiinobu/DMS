@@ -45,7 +45,7 @@ func (h *HealthHandler) Check(
 		http.StatusOK,
 		gin.H{
 			"success": true,
-			"message": "DMS Service is Running",
+			"message": "Service is Healthy",
 		},
 	)
 }

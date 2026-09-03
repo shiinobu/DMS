@@ -25,35 +25,35 @@ func NewDeviceHandler(
 }
 
 func validationError(err error) map[string]string {
-    errors := make(map[string]string)
+	var validationErrors validator.ValidationErrors
 
-    for _, e := range err.(validator.ValidationErrors) {
-        field := e.Field()
+	if !errors.As(err, &validationErrors) {
+		return map[string]string{
+			"request": "invalid request",
+		}
+	}
 
-        switch field {
-        case "DeviceID":
-            errors["device_id"] = "Device ID is required"
-        case "DeviceName":
-            errors["device_name"] = "Device name is required"
-        case "SerialNumber":
-            errors["serial_number"] = "Serial number is required"
-        default:
-            errors[field] = "This field is required"
-        }
-    }
+	fields := make(map[string]string)
 
-    return errors
+	for _, fieldError := range validationErrors {
+		fields[fieldError.Field()] = fieldError.Error()
+	}
+
+	return fields
 }
 
 func (h *DeviceHandler) Create(c *gin.Context) {
 	var req CreateDeviceRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"message": "invalid request",
-			"error":   validationError(err),
-		})
+		c.JSON(
+			http.StatusBadRequest,
+			gin.H{
+				"success": false,
+				"message": "validation failed",
+				"errors":  validationError(err),
+			},
+		)
 		return
 	}
 
@@ -73,7 +73,6 @@ func (h *DeviceHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": "failed to create device",
-			"error":   err.Error(),
 		})
 		return
 	}
@@ -92,8 +91,7 @@ func (h *DeviceHandler) FindAll(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
-			"message": "failed to get devices",
-			"error":   err.Error(),
+			"message": "failed to retrieve devices",
 		})
 		return
 	}
@@ -123,8 +121,7 @@ func (h *DeviceHandler) FindByDeviceID(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
-			"message": "failed to get device",
-			"error":   err.Error(),
+			"message": "failed to retrieve device",
 		})
 		return
 	}
@@ -141,11 +138,14 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 	var req UpdateDeviceRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"message": "invalid request",
-			"error":   err.Error(),
-		})
+		c.JSON(
+			http.StatusBadRequest,
+			gin.H{
+				"success": false,
+				"message": "validation failed",
+				"errors":  validationError(err),
+			},
+		)
 		return
 	}
 
@@ -175,7 +175,6 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": "failed to update device",
-			"error":   err.Error(),
 		})
 		return
 	}
@@ -206,7 +205,6 @@ func (h *DeviceHandler) Delete(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": "failed to delete device",
-			"error":   err.Error(),
 		})
 		return
 	}

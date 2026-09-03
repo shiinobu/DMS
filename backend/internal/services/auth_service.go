@@ -13,54 +13,53 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var ErrInvalidCredentials = errors.New("invalid username or password")
+var ErrInvalidCredentials = errors.New(
+	"invalid username or password",
+)
 
 type AuthService struct {
-	repository  *repositories.UserRepository
-	jwtSecret   string
-	jwtExpire   time.Duration
+	repository    *repositories.UserRepository
+	jwtSecret     string
+	jwtExpiration time.Duration
 }
 
 func NewAuthService(
 	repository *repositories.UserRepository,
 	jwtSecret string,
-	jwtExpire time.Duration,
+	jwtExpiration time.Duration,
 ) *AuthService {
 	return &AuthService{
-		repository: repository,
-		jwtSecret:  jwtSecret,
-		jwtExpire:  jwtExpire,
+		repository:    repository,
+		jwtSecret:     jwtSecret,
+		jwtExpiration: jwtExpiration,
 	}
+}
+
+type LoginResult struct {
+	Token string
+	User  *models.User
 }
 
 func (s *AuthService) Login(
 	ctx context.Context,
 	username string,
 	password string,
-) (string, *models.User, error) {
-
+) (*LoginResult, error) {
 	username = strings.TrimSpace(username)
 
 	user, err := s.repository.FindByUsername(
 		ctx,
 		username,
 	)
-
 	if err != nil {
-		if errors.Is(err, repositories.ErrUserNotFound) {
-			return "", nil, ErrInvalidCredentials
-		}
-
-		return "", nil, err
+		return nil, ErrInvalidCredentials
 	}
 
-	err = bcrypt.CompareHashAndPassword(
+	if err := bcrypt.CompareHashAndPassword(
 		[]byte(user.PasswordHash),
 		[]byte(password),
-	)
-
-	if err != nil {
-		return "", nil, ErrInvalidCredentials
+	); err != nil {
+		return nil, ErrInvalidCredentials
 	}
 
 	token, err := auth.GenerateToken(
@@ -68,12 +67,14 @@ func (s *AuthService) Login(
 		user.Username,
 		user.Role,
 		s.jwtSecret,
-		s.jwtExpire,
+		s.jwtExpiration,
 	)
-
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
-	return token, user, nil
+	return &LoginResult{
+		Token: token,
+		User:  user,
+	}, nil
 }

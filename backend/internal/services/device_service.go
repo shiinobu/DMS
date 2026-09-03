@@ -9,7 +9,7 @@ import (
 )
 
 type DeviceService struct {
-	repository *repositories.DeviceRepository
+	repository    *repositories.DeviceRepository
 	statusChanged chan DeviceStatusChangedEvent
 }
 
@@ -17,7 +17,7 @@ func NewDeviceService(
 	repository *repositories.DeviceRepository,
 ) *DeviceService {
 	return &DeviceService{
-		repository: repository,
+		repository:    repository,
 		statusChanged: make(chan DeviceStatusChangedEvent, 100),
 	}
 }
@@ -29,9 +29,7 @@ func (s *DeviceService) Create(
 	device.DeviceID = strings.TrimSpace(device.DeviceID)
 	device.DeviceName = strings.TrimSpace(device.DeviceName)
 	device.SerialNumber = strings.TrimSpace(device.SerialNumber)
-
 	device.Status = models.DeviceStatusOffline
-
 	return s.repository.Create(ctx, device)
 }
 
@@ -45,6 +43,8 @@ func (s *DeviceService) FindByDeviceID(
 	ctx context.Context,
 	deviceID string,
 ) (*models.Device, error) {
+	deviceID = strings.TrimSpace(deviceID)
+
 	return s.repository.FindByDeviceID(ctx, deviceID)
 }
 
@@ -81,23 +81,19 @@ func (s *DeviceService) Heartbeat(
 	deviceID string,
 	ipAddress *string,
 ) (*models.Device, models.DeviceStatus, error) {
-
 	deviceID = strings.TrimSpace(deviceID)
-
 	device, previousStatus, err := s.repository.Heartbeat(
 		ctx,
 		deviceID,
 		ipAddress,
 	)
-
 	if err != nil {
 		return nil, "", err
 	}
 
 	if previousStatus != device.Status {
-
 		s.statusChanged <- DeviceStatusChangedEvent{
-			Type:     "DEVICE_STATUS_CHANGED",
+			Type:     DeviceStatusChangedEventType,
 			DeviceID: device.DeviceID,
 			Status:   device.Status,
 			Device:   *device,
@@ -108,6 +104,5 @@ func (s *DeviceService) Heartbeat(
 }
 
 func (s *DeviceService) StatusChanged() <-chan DeviceStatusChangedEvent {
-
 	return s.statusChanged
 }

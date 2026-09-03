@@ -8,16 +8,13 @@ import (
 
 const (
 	writeWait = 10 * time.Second
-
 	pongWait = 60 * time.Second
-
 	pingPeriod = (pongWait * 9) / 10
 )
 
 type Client struct {
 	hub  *Hub
 	conn *gws.Conn
-
 	send chan []byte
 }
 
@@ -25,7 +22,6 @@ func NewClient(
 	hub *Hub,
 	conn *gws.Conn,
 ) *Client {
-
 	return &Client{
 		hub:  hub,
 		conn: conn,
@@ -34,10 +30,8 @@ func NewClient(
 }
 
 func (c *Client) readPump() {
-
 	defer func() {
 		c.hub.unregister <- c
-
 		c.conn.Close()
 	}()
 
@@ -46,18 +40,14 @@ func (c *Client) readPump() {
 	)
 
 	c.conn.SetPongHandler(func(string) error {
-
 		c.conn.SetReadDeadline(
 			time.Now().Add(pongWait),
 		)
-
 		return nil
 	})
 
 	for {
-
 		_, _, err := c.conn.ReadMessage()
-
 		if err != nil {
 			break
 		}
@@ -71,18 +61,13 @@ func (c *Client) writePump() {
 	)
 
 	defer func() {
-
 		ticker.Stop()
-
 		c.conn.Close()
 	}()
 
 	for {
-
 		select {
-
 		case message, ok := <-c.send:
-
 			c.conn.SetWriteDeadline(
 				time.Now().Add(writeWait),
 			)
@@ -92,7 +77,6 @@ func (c *Client) writePump() {
 					gws.CloseMessage,
 					[]byte{},
 				)
-
 				return
 			}
 
@@ -106,7 +90,6 @@ func (c *Client) writePump() {
 			}
 
 		case <-ticker.C:
-
 			c.conn.SetWriteDeadline(
 				time.Now().Add(writeWait),
 			)

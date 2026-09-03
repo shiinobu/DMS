@@ -9,21 +9,15 @@ import (
 )
 
 var upgrader = gws.Upgrader{
-
 	ReadBufferSize:  1024,
-
 	WriteBufferSize: 1024,
-
 	CheckOrigin: func(r *http.Request) bool {
-
 		return true
 	},
 }
 
 func Handler(hub *Hub) gin.HandlerFunc {
-
 	return func(c *gin.Context) {
-
 		conn, err := upgrader.Upgrade(
 			c.Writer,
 			c.Request,
@@ -42,7 +36,6 @@ func Handler(hub *Hub) gin.HandlerFunc {
 		hub.register <- client
 
 		go client.writePump()
-
 		go client.readPump()
 	}
 }

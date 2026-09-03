@@ -13,6 +13,22 @@ import (
 
 var ErrDeviceNotFound = errors.New("device not found")
 
+const deviceColumns = `
+	id,
+	device_id,
+	device_name,
+	serial_number,
+	os_version,
+	ip_address::text,
+	location,
+	status,
+	last_seen,
+	last_online_at,
+	last_offline_at,
+	created_at,
+	updated_at
+`
+
 type DeviceRepository struct {
 	db *pgxpool.Pool
 }
@@ -69,20 +85,7 @@ func (r *DeviceRepository) FindAll(
 	ctx context.Context,
 ) ([]models.Device, error) {
 	query := `
-		SELECT
-			id,
-			device_id,
-			device_name,
-			serial_number,
-			os_version,
-			ip_address::text,
-			location,
-			status,
-			last_seen,
-			last_online_at,
-			last_offline_at,
-			created_at,
-			updated_at
+		SELECT ` + deviceColumns + `
 		FROM devices
 		ORDER BY id DESC
 	`
@@ -133,20 +136,7 @@ func (r *DeviceRepository) FindByDeviceID(
 	deviceID string,
 ) (*models.Device, error) {
 	query := `
-		SELECT
-			id,
-			device_id,
-			device_name,
-			serial_number,
-			os_version,
-			ip_address::text,
-			location,
-			status,
-			last_seen,
-			last_online_at,
-			last_offline_at,
-			created_at,
-			updated_at
+		SELECT ` + deviceColumns + `
 		FROM devices
 		WHERE device_id = $1
 	`
@@ -375,20 +365,7 @@ func (r *DeviceRepository) FindOfflineCandidates(
 ) ([]models.Device, error) {
 
 	query := `
-		SELECT
-			id,
-			device_id,
-			device_name,
-			serial_number,
-			os_version,
-			ip_address::text,
-			location,
-			status,
-			last_seen,
-			last_online_at,
-			last_offline_at,
-			created_at,
-			updated_at
+		SELECT ` + deviceColumns + `
 		FROM devices
 		WHERE status = 'ONLINE'
 		  AND last_seen IS NOT NULL
