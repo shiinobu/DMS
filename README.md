@@ -17,6 +17,24 @@ online/offline notifications, and generating basic reports.
 - CSV device export
 - Docker Compose deployment
 
+## Documentation
+
+- [1. Project Overview](#1-project-overview)
+- [2. Architecture](#2-architecture)
+- [3. Requirements](#3-requirements)
+- [4. Installation](#4-installation)
+- [5. Configuration](#5-configuration)
+- [6. Database](#6-database)
+- [7. Admin User](#7-admin-user)
+- [8. Run the Application](#8-run-the-application)
+- [9. Simulator](#9-simulator)
+- [10. Device Status & Realtime](#10-device-status--realtime)
+- [11. API Reference](#11-api-reference)
+- [12. Reports & CSV Export](#12-reports--csv-export)
+- [13. Docker Deployment](#13-docker-deployment)
+- [14. Troubleshooting](#14-troubleshooting)
+- [License](#license)
+
 ---
 
 # 1. Project Overview
