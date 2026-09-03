@@ -1,12 +1,20 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"log"
 
-	"github.com/gin-gonic/gin"
+	"dms/backend/internal/config"
+	"dms/backend/internal/database"
+	"dms/backend/internal/handlers"
+	"dms/backend/internal/middleware"
+	"dms/backend/internal/repositories"
+	"dms/backend/internal/services"
+	"dms/backend/internal/websocket"
 
-	"dms/internal/config"
-	"dms/internal/database"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -15,13 +23,103 @@ func main() {
 		log.Fatal("failed to load config:", err)
 	}
 
-	db, err := database.Connect(cfg.DatabaseURL)
+	db, err := database.NewPostgresPool(cfg)
 	if err != nil {
 		log.Fatal("failed to connect database:", err)
 	}
 	defer db.Close()
 
+	// Repository
+	deviceRepository := repositories.NewDeviceRepository(db)
+	userRepository := repositories.NewUserRepository(db)
+
+	// Service
+	deviceService := services.NewDeviceService(
+		deviceRepository,
+	)
+	authService := services.NewAuthService(
+		userRepository,
+		cfg.JWTSecret,
+		cfg.JWTExpiration,
+	)
+
+	// Handler
+	deviceHandler := handlers.NewDeviceHandler(
+		deviceService,
+	)
+	authHandler := handlers.NewAuthHandler(authService)
+
+	statusMonitor := services.NewStatusMonitor(
+		deviceRepository,
+		cfg.HeartbeatTimeout,
+		cfg.StatusCheckInterval,
+	)
+
+	// Start status monitor in background
+	go statusMonitor.Start(context.Background())
+
+	// WebSocket hub
+	hub := websocket.NewHub()
+	go hub.Run()
+
+	go func() {
+		for event := range deviceService.StatusChanged() {
+
+			message, err := json.Marshal(event)
+
+			if err != nil {
+				log.Println(
+					"failed to marshal device event:",
+					err,
+				)
+
+				continue
+			}
+
+			hub.Broadcast(message)
+		}
+
+	}()
+
+	go func() {
+		for event := range statusMonitor.StatusChanged() {
+
+			message, err := json.Marshal(event)
+
+			if err != nil {
+				log.Println(
+					"failed to marshal device status event:",
+					err,
+				)
+
+				continue
+			}
+
+			hub.Broadcast(message)
+		}
+
+	}()
+
 	router := gin.Default()
+	router.Use(cors.New(cors.Config{
+		AllowOrigins: []string{
+			cfg.CORSOrigin,
+		},
+		AllowMethods: []string{
+			"GET",
+			"POST",
+			"PUT",
+			"PATCH",
+			"DELETE",
+			"OPTIONS",
+		},
+		AllowHeaders: []string{
+			"Origin",
+			"Content-Type",
+			"Authorization",
+		},
+		AllowCredentials: true,
+	}))
 
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -29,6 +127,27 @@ func main() {
 			"message": "DMS backend is running",
 		})
 	})
+
+	api := router.Group("/api/v1")
+	api.GET("/ws", websocket.Handler(hub))
+
+	// Public authentication
+	api.POST("/auth/login", authHandler.Login)
+	api.POST("/devices/:device_id/heartbeat", deviceHandler.Heartbeat)
+
+	// Protected routes
+	protected := api.Group("")
+	protected.Use(middleware.JWTAuth(cfg.JWTSecret))
+	protected.Use(middleware.AdminOnly())
+
+	devices := protected.Group("/devices")
+	{
+		devices.POST("", deviceHandler.Create)
+		devices.GET("", deviceHandler.FindAll)
+		devices.GET("/:device_id", deviceHandler.FindByDeviceID)
+		devices.PUT("/:device_id", deviceHandler.Update)
+		devices.DELETE("/:device_id", deviceHandler.Delete)
+	}
 
 	log.Printf(
 		"DMS backend running on :%s",

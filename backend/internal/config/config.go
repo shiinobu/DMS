@@ -8,8 +8,8 @@ import (
 )
 
 type Config struct {
-	AppEnv   string
-	AppPort  string
+	AppEnv      string
+	AppPort     string
 	DatabaseURL string
 
 	JWTSecret     string
@@ -46,8 +46,8 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		AppEnv:   getEnv("APP_ENV", "development"),
-		AppPort:  getEnv("APP_PORT", "8080"),
+		AppEnv:  getEnv("APP_ENV", "development"),
+		AppPort: getEnv("APP_PORT", "8080"),
 
 		DatabaseURL: getEnv("DATABASE_URL", ""),
 

@@ -4,31 +4,35 @@ import (
 	"context"
 	"time"
 
+	"dms/backend/internal/config"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func Connect(databaseURL string) (*pgxpool.Pool, error) {
-	config, err := pgxpool.ParseConfig(databaseURL)
+func NewPostgresPool(cfg *config.Config) (*pgxpool.Pool, error) {
+	poolConfig, err := pgxpool.ParseConfig(cfg.DatabaseURL)
 	if err != nil {
 		return nil, err
 	}
 
-	config.MaxConns = 10
-	config.MinConns = 2
-	config.MaxConnLifetime = time.Hour
+	// Connection pool configuration
+	poolConfig.MaxConns = 10
+	poolConfig.MinConns = 2
+	poolConfig.MaxConnLifetime = time.Hour
 
-	pool, err := pgxpool.NewWithConfig(
+	db, err := pgxpool.NewWithConfig(
 		context.Background(),
-		config,
+		poolConfig,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := pool.Ping(context.Background()); err != nil {
-		pool.Close()
+	// Test database connection
+	if err := db.Ping(context.Background()); err != nil {
+		db.Close()
 		return nil, err
 	}
 
-	return pool, nil
+	return db, nil
 }
