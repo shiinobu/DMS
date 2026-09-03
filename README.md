@@ -1,4 +1,6 @@
+<div>
 # Device Management System (DMS)
+</div>
 
 A simple Device Management System (DMS) for registering devices, receiving
 periodic heartbeats, monitoring device availability in real time, sending
