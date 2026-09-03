@@ -69,11 +69,8 @@ func JWTAuth(secret string) gin.HandlerFunc {
 }
 
 func AdminOnly() gin.HandlerFunc {
-
 	return func(c *gin.Context) {
-
 		roleValue, exists := c.Get("role")
-
 		if !exists {
 			c.JSON(http.StatusForbidden, gin.H{
 				"success": false,

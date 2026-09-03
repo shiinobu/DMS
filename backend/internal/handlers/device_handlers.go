@@ -9,6 +9,7 @@ import (
 	"dms/backend/internal/services"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 )
 
 type DeviceHandler struct {
@@ -23,6 +24,27 @@ func NewDeviceHandler(
 	}
 }
 
+func validationError(err error) map[string]string {
+    errors := make(map[string]string)
+
+    for _, e := range err.(validator.ValidationErrors) {
+        field := e.Field()
+
+        switch field {
+        case "DeviceID":
+            errors["device_id"] = "Device ID is required"
+        case "DeviceName":
+            errors["device_name"] = "Device name is required"
+        case "SerialNumber":
+            errors["serial_number"] = "Serial number is required"
+        default:
+            errors[field] = "This field is required"
+        }
+    }
+
+    return errors
+}
+
 func (h *DeviceHandler) Create(c *gin.Context) {
 	var req CreateDeviceRequest
 
@@ -30,7 +52,7 @@ func (h *DeviceHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"message": "invalid request",
-			"error":   err.Error(),
+			"error":   validationError(err),
 		})
 		return
 	}

@@ -32,6 +32,7 @@ func main() {
 	// Repository
 	deviceRepository := repositories.NewDeviceRepository(db)
 	userRepository := repositories.NewUserRepository(db)
+	reportRepository := repositories.NewReportRepository(db)
 
 	// Service
 	deviceService := services.NewDeviceService(
@@ -42,18 +43,24 @@ func main() {
 		cfg.JWTSecret,
 		cfg.JWTExpiration,
 	)
+	reportService := services.NewReportService(
+		reportRepository,
+	)
+	statusMonitor := services.NewStatusMonitor(
+		deviceRepository,
+		cfg.HeartbeatTimeout,
+		cfg.StatusCheckInterval,
+	)
 
 	// Handler
 	deviceHandler := handlers.NewDeviceHandler(
 		deviceService,
 	)
 	authHandler := handlers.NewAuthHandler(authService)
-
-	statusMonitor := services.NewStatusMonitor(
-		deviceRepository,
-		cfg.HeartbeatTimeout,
-		cfg.StatusCheckInterval,
+	reportHandler := handlers.NewReportHandler(
+		reportService,
 	)
+	healthHandler := handlers.NewHealthHandler(db)
 
 	// Start status monitor in background
 	go statusMonitor.Start(context.Background())
@@ -121,12 +128,7 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"success": true,
-			"message": "DMS backend is running",
-		})
-	})
+	router.GET("/health", healthHandler.Check)
 
 	api := router.Group("/api/v1")
 	api.GET("/ws", websocket.Handler(hub))
@@ -147,6 +149,12 @@ func main() {
 		devices.GET("/:device_id", deviceHandler.FindByDeviceID)
 		devices.PUT("/:device_id", deviceHandler.Update)
 		devices.DELETE("/:device_id", deviceHandler.Delete)
+	}
+
+	reports := protected.Group("/reports")
+	{
+		reports.GET("/summary", reportHandler.GetSummary)
+		reports.GET("/devices/export", reportHandler.ExportDevices)
 	}
 
 	log.Printf(

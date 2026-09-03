@@ -11,9 +11,9 @@ const (
 
 type Device struct {
 	ID            int64        `json:"id"`
-	DeviceID      string       `json:"device_id"`
-	DeviceName    string       `json:"device_name"`
-	SerialNumber  string       `json:"serial_number"`
+	DeviceID      string       `json:"device_id" gorm:"uniqueIndex;not null" validate:"required"`
+	DeviceName    string       `json:"device_name" validate:"required"`
+	SerialNumber  string       `json:"serial_number" validate:"required"`
 	OSVersion     *string      `json:"os_version,omitempty"`
 	IPAddress     *string      `json:"ip_address,omitempty"`
 	Location      *string      `json:"location,omitempty"`
