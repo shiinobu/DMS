@@ -1,5 +1,7 @@
-<div>
+<div align="center">
+
 # Device Management System (DMS)
+
 </div>
 
 A simple Device Management System (DMS) for registering devices, receiving
