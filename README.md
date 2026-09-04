@@ -23,8 +23,10 @@ online/offline notifications, and generating basic reports.
 
 ## Documentation
 
+**Video Demo**
+
 ```powershell
-🎥 **VIDEO DEMO** →→→→→ [LINK](https://shorturl.at/7wM7z)
+https://shorturl.at/7wM7z
 ```
 
 - [1. Project Overview](#1-project-overview)
