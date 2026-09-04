@@ -23,6 +23,10 @@ online/offline notifications, and generating basic reports.
 
 ## Documentation
 
+```powershell
+🎥 **VIDEO DEMO** →→→→→ [LINK](https://shorturl.at/7wM7z)
+```
+
 - [1. Project Overview](#1-project-overview)
 - [2. Architecture](#2-architecture)
 - [3. Requirements](#3-requirements)
@@ -192,7 +196,7 @@ There are two ways to run the DMS:
 ## Clone
 
 ```powershell
-git clone https://github.com/shiinobu/DMS.git
+git clone <repository-url>
 cd DMS
 ```
 
