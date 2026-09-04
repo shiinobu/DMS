@@ -184,6 +184,11 @@ docker compose version
 
 # 4. Installation
 
+There are two ways to run the DMS:
+
+1. **Local Development** — run PostgreSQL, Backend, Frontend, and Simulator separately.
+2. **Docker Compose** — run the complete application stack with Docker.
+
 ## Clone
 
 ```powershell
@@ -191,26 +196,103 @@ git clone <repository-url>
 cd DMS
 ```
 
-## Backend
+---
+
+## Option A — Local Development
+
+Use this option when developing or debugging individual services.
+
+### Backend
 
 ```powershell
-cd backend
+cd .\backend
 go mod download
 ```
 
-## Frontend
+### Frontend
 
 ```powershell
-cd ..\frontend
+cd .\frontend
 npm install
 ```
 
-## Simulator
+### Simulator
 
 ```powershell
-cd ..\simulator
+cd .\simulator
 go mod download
 ```
+
+Make sure PostgreSQL is running before starting the backend.
+
+For local development, the backend uses:
+
+```env
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/dms?sslmode=disable
+```
+
+See [5. Configuration](#5-configuration) and [6. Database](#6-database) for configuration and database setup.
+
+---
+
+## Option B — Docker Compose
+
+Docker Compose is the simplest way to run the complete DMS stack.
+
+Make sure **Docker Desktop is installed and running**, then execute these commands from the project root:
+
+### 1. Build the images
+
+```powershell
+docker compose build
+```
+
+### 2. Start all services
+
+```powershell
+docker compose up -d
+```
+
+### 3. Check the containers
+
+```powershell
+docker compose ps
+```
+
+The following services should be running:
+
+```text
+postgres
+backend
+frontend
+simulator
+```
+
+### 4. Open the application
+
+Frontend:
+
+```text
+http://localhost:3000
+```
+
+Backend health check:
+
+```text
+http://localhost:8080/health
+```
+
+### Quick Start
+
+If you want to build and start everything in one command:
+
+```powershell
+docker compose up -d --build
+```
+
+For Docker networking and service configuration, see [13. Docker Deployment](#13-docker-deployment).
+
+---
 
 # 5. Configuration
 
@@ -847,6 +929,56 @@ localhost:8080
 
 Browser → WebSocket
 localhost:8080
+```
+
+### Common Docker Commands
+
+### Start services
+
+```powershell
+docker compose up -d
+```
+
+### Stop services
+
+```powershell
+docker compose down
+```
+
+### Rebuild after code or dependency changes
+
+```powershell
+docker compose up -d --build
+```
+
+### View all logs
+
+```powershell
+docker compose logs -f
+```
+
+### View backend logs
+
+```powershell
+docker compose logs -f backend
+```
+
+### View frontend logs
+
+```powershell
+docker compose logs -f frontend
+```
+
+### View simulator logs
+
+```powershell
+docker compose logs -f simulator
+```
+
+### Restart services
+
+```powershell
+docker compose restart
 ```
 
 The rule is simple:
