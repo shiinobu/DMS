@@ -9,7 +9,7 @@ COPY . .
 
 RUN go build -o server ./cmd/server
 RUN go build -o seed-admin ./cmd/seed-admin
-
+RUN cp .env.example .env
 
 FROM alpine:3.20
 
