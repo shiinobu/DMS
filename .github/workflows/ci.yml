@@ -30,8 +30,8 @@ jobs:
       - name: Run tests
         run: go test ./...
 
-      - name: Check formatting
-        run: test -z "$(gofmt -l .)"
+      - name: Run go vet
+        run: go vet ./...
 
   frontend:
     name: Frontend Checks
