@@ -198,7 +198,7 @@ There are two ways to run the DMS:
 ## Clone
 
 ```powershell
-git clone <repository-url>
+git clone https://github.com/shiinobu/DMS.git
 cd DMS
 ```
 
