@@ -1,104 +1,66 @@
-<div align="center">
-
 # Device Management System (DMS)
 
-</div>
+A realtime Device Management System built to monitor device availability through periodic heartbeats and WebSocket status updates.
 
-A simple Device Management System (DMS) for registering devices, receiving
-periodic heartbeats, monitoring device availability in real time, sending
-online/offline notifications, and generating basic reports.
+The project demonstrates a practical backend architecture with **Go, PostgreSQL, JWT authentication, background monitoring, WebSocket, and Docker Compose**, integrated with a **Next.js dashboard**.
 
-## Features
+## Highlights
 
-- Admin authentication using JWT
+- JWT-based admin authentication
 - Device registration and CRUD management
-- Device simulator for 5 devices
-- Heartbeat every 10 seconds
-- Automatic ONLINE/OFFLINE detection
-- Real-time status updates using WebSocket
+- Device heartbeat every 10 seconds
+- Automatic `ONLINE` / `OFFLINE` detection
+- Realtime status updates through WebSocket
 - Browser notifications for status transitions
-- Device monitoring summary
-- CSV device export
-- Docker Compose deployment
+- Monitoring summary and CSV export
+- Five-device simulator for local testing
+- Docker Compose setup for the complete stack
+- Layered backend architecture: Handler → Service → Repository
 
-## Documentation
-
-**Video Demo**
-
-```powershell
-https://shorturl.at/7wM7z
-```
-
-- [1. Project Overview](#1-project-overview)
-- [2. Architecture](#2-architecture)
-- [3. Requirements](#3-requirements)
-- [4. Installation](#4-installation)
-- [5. Configuration](#5-configuration)
-- [6. Database](#6-database)
-- [7. Admin User](#7-admin-user)
-- [8. Run the Application](#8-run-the-application)
-- [9. Simulator](#9-simulator)
-- [10. Device Status & Realtime](#10-device-status--realtime)
-- [11. API Reference](#11-api-reference)
-- [12. Reports & CSV Export](#12-reports--csv-export)
-- [13. Docker Deployment](#13-docker-deployment)
-- [14. Troubleshooting](#14-troubleshooting)
-- [License](#license)
-
----
-
-# 1. Project Overview
-
-The DMS monitors the availability of registered devices.
-
-Each device sends a heartbeat every 10 seconds. When a heartbeat is received,
-the device becomes `ONLINE`.
-
-If no heartbeat is received for more than 30 seconds, the backend changes the
-device to `OFFLINE`.
-
-Status changes are broadcast through WebSocket to the Next.js dashboard.
+## Architecture
 
 ```text
-Device / Simulator
-       |
-       | Heartbeat
-       v
-  Go Backend
-       |
-       +----> PostgreSQL
-       |
-       +----> Status Monitor
-       |
-       +----> WebSocket
-                  |
-                  v
-           Next.js Dashboard
-                  |
-                  v
-             Notification
+┌───────────────┐
+│ Device /      │
+│ Simulator     │
+└───────┬───────┘
+        │ Heartbeat / REST API
+        ▼
+┌──────────────────────┐
+│ Go Backend           │
+│ Gin + JWT            │
+│ Handler → Service    │
+│ → Repository         │
+└──────┬───────┬───────┘
+       │       │
+       ▼       ▼
+┌──────────┐  ┌────────────────┐
+│PostgreSQL│  │ Status Monitor │
+└──────────┘  └───────┬────────┘
+                      │
+                      ▼
+               ┌──────────────┐
+               │  WebSocket   │
+               └──────┬───────┘
+                      ▼
+               ┌──────────────┐
+               │ Next.js      │
+               │ Dashboard    │
+               └──────────────┘
 ```
 
-# 2. Architecture
+### Realtime flow
 
-The backend uses a simple layered architecture:
+1. A device sends a heartbeat every 10 seconds.
+2. The backend records `last_seen` and marks the device `ONLINE`.
+3. A background monitor checks device activity every 5 seconds.
+4. A device becomes `OFFLINE` when no heartbeat is received for more than 30 seconds.
+5. Status transitions are broadcast to connected dashboards through WebSocket.
+6. The frontend updates the device list and monitoring statistics without a page refresh.
 
-```text
-Handler
-   |
-   v
-Service
-   |
-   v
-Repository
-   |
-   v
-PostgreSQL
-```
+## Tech Stack
 
-### Technology Stack
-
-**Backend**
+### Backend
 
 - Go 1.24+
 - Gin
@@ -107,18 +69,20 @@ PostgreSQL
 - bcrypt
 - Gorilla WebSocket
 
-**Frontend**
+### Frontend
 
 - Next.js 16
 - React 19
 - TypeScript
 - Tailwind CSS
 
-**Database**
+### Database & Infrastructure
 
 - PostgreSQL 16+
+- Docker
+- Docker Compose
 
-### Project Structure
+## Project Structure
 
 ```text
 DMS/
@@ -136,33 +100,19 @@ DMS/
 │   │   ├── repositories/
 │   │   ├── services/
 │   │   └── websocket/
-│   ├── migrations/
-│   ├── .env
-│   ├── Dockerfile
-│   ├── go.mod
-│   └── go.sum
-│
+│   └── migrations/
 ├── frontend/
-│   ├── src/
-│   │   ├── app/
-│   │   ├── components/
-│   │   ├── lib/
-│   │   └── types/
-│   ├── .env.local
-│   ├── Dockerfile
-│   └── package.json
-│
+│   └── src/
+│       ├── app/
+│       ├── components/
+│       ├── lib/
+│       └── types/
 ├── simulator/
-│   ├── main.go
-│   ├── Dockerfile
-│   ├── go.mod
-│   └── go.sum
-│
 ├── docker-compose.yml
 └── README.md
 ```
 
-# 3. Requirements
+## Requirements
 
 For local development:
 
@@ -172,100 +122,27 @@ For local development:
 - PostgreSQL 16+
 - Git
 
-Optional:
+For the easiest setup, use Docker Desktop with Docker Compose.
 
-- Docker Desktop
-- Docker Compose
+## Installation
 
-Check versions:
+### Option 1 — Docker Compose
 
-```powershell
-go version
-node --version
-npm --version
-psql --version
-docker --version
-docker compose version
-```
-
-# 4. Installation
-
-There are two ways to run the DMS:
-
-1. **Local Development** — run PostgreSQL, Backend, Frontend, and Simulator separately.
-2. **Docker Compose** — run the complete application stack with Docker.
-
-## Clone
-
-```powershell
-git clone https://github.com/shiinobu/DMS.git
-cd DMS
-```
-
----
-
-## Option A — Local Development
-
-Use this option when developing or debugging individual services.
-
-### Backend
-
-```powershell
-cd .\backend
-go mod download
-```
-
-### Frontend
-
-```powershell
-cd .\frontend
-npm install
-```
-
-### Simulator
-
-```powershell
-cd .\simulator
-go mod download
-```
-
-Make sure PostgreSQL is running before starting the backend.
-
-For local development, the backend uses:
-
-```env
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/dms?sslmode=disable
-```
-
-See [5. Configuration](#5-configuration) and [6. Database](#6-database) for configuration and database setup.
-
----
-
-## Option B — Docker Compose
-
-Docker Compose is the simplest way to run the complete DMS stack.
-
-Make sure **Docker Desktop is installed and running**, then execute these commands from the project root:
-
-### 1. Build the images
+From the project root:
 
 ```powershell
 docker compose build
-```
-
-### 2. Start all services
-
-```powershell
 docker compose up -d
-```
-
-### 3. Check the containers
-
-```powershell
 docker compose ps
 ```
 
-The following services should be running:
+Or build and start in one command:
+
+```powershell
+docker compose up -d --build
+```
+
+Expected services:
 
 ```text
 postgres
@@ -274,275 +151,141 @@ frontend
 simulator
 ```
 
-### 4. Open the application
-
-Frontend:
+Open the dashboard:
 
 ```text
 http://localhost:3000
 ```
 
-Backend health check:
+Check the backend:
 
 ```text
 http://localhost:8080/health
 ```
 
-### Quick Start
-
-If you want to build and start everything in one command:
+Stop the stack:
 
 ```powershell
-docker compose up -d --build
+docker compose down
 ```
 
-For Docker networking and service configuration, see [13. Docker Deployment](#13-docker-deployment).
+### Option 2 — Local Development
 
----
+Clone the repository:
 
-# 5. Configuration
-
-## Backend
-
-Create:
-
-```text
-backend/.env
+```powershell
+git clone https://github.com/shiinobu/DMS.git
+cd DMS
 ```
 
-### Backend + PostgreSQL running locally
+Install backend dependencies:
+
+```powershell
+cd backend
+go mod download
+```
+
+Install frontend dependencies:
+
+```powershell
+cd ..\frontend
+npm install
+```
+
+Install simulator dependencies:
+
+```powershell
+cd ..\simulator
+go mod download
+```
+
+Create `backend/.env` from `backend/.env.example` and configure PostgreSQL and application secrets for your local environment.
+
+For local development, the database URL normally uses:
+
+```env
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/dms?sslmode=disable
+```
+
+Run the database migrations in numerical order, then start the services:
+
+```powershell
+# Backend
+cd backend
+go run ./cmd/server
+
+# Frontend
+cd ..\frontend
+npm run dev
+
+# Simulator
+cd ..\simulator
+go run .
+```
+
+## Configuration
+
+Backend environment variables:
 
 ```env
 APP_ENV=development
 APP_PORT=8080
-
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/dms?sslmode=disable
-
 JWT_SECRET=change-this-secret
 JWT_EXPIRATION=24h
-
 HEARTBEAT_TIMEOUT=30s
 STATUS_CHECK_INTERVAL=5s
-
-CORS_ORIGIN=http://localhost:3000
-
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=admin123
+ADMIN_PASSWORD=change-this-password
+CORS_ORIGIN=http://localhost:3000
 ```
 
-### Backend + PostgreSQL running in Docker
-
-Use the Docker service name `postgres`:
-
-```env
-DATABASE_URL=postgres://postgres:postgres@postgres:5432/dms?sslmode=disable
-```
-
-The important rule is:
-
-```text
-Backend running on Windows  → localhost:5432
-Backend running in Docker   → postgres:5432
-```
-
-Do not use the Docker hostname `postgres` from a backend running directly
-on Windows.
-
-## Frontend
-
-Create:
-
-```text
-frontend/.env.local
-```
+Frontend:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
 NEXT_PUBLIC_WS_URL=ws://localhost:8080/api/v1/ws
 ```
 
-These URLs are used by browser-side JavaScript, so keep `localhost` when
-accessing the application through the host machine.
+When the backend runs inside Docker, containers communicate using Docker service names. Browser-side `NEXT_PUBLIC_*` URLs should continue to use `localhost` when the browser accesses the application from the host machine.
 
-Do not use:
+> Never commit real `.env` files, passwords, database credentials, or production JWT secrets. Use `backend/.env.example` as the configuration template.
 
-```text
-http://backend:8080
-ws://backend:8080
-```
+## Database
 
-for `NEXT_PUBLIC_*` variables.
-
-## Simulator
-
-When running locally:
-
-```env
-DMS_API_URL=http://localhost:8080/api/v1
-```
-
-When running in Docker:
-
-```env
-DMS_API_URL=http://backend:8080/api/v1
-```
-
-Optional credentials:
-
-```env
-DMS_USERNAME=admin
-DMS_PASSWORD=admin123
-```
-
-### Docker networking rule
-
-```text
-Host / Browser → localhost
-Container → Docker service name
-```
-
-Examples:
-
-```text
-Browser → Backend       localhost:8080
-Backend → PostgreSQL   postgres:5432
-Simulator → Backend    backend:8080
-```
-
-# 6. Database
-
-Create the database:
+Create the database if you are running PostgreSQL locally:
 
 ```sql
 CREATE DATABASE dms;
 ```
 
-Run migrations in numerical order:
+Run migrations from `backend/migrations/` in numerical order.
 
-```powershell
-cd backend
+The system tracks device information such as:
 
-psql -U postgres -d dms -f migrations/001_create_devices.sql
-psql -U postgres -d dms -f migrations/002_create_users.sql
-```
+- Device ID
+- Device name
+- Serial number
+- OS version
+- IP address
+- Location
+- Status
+- Last heartbeat
+- Last online/offline timestamps
+- Created/updated timestamps
 
-If additional migration files exist, execute them in numerical order.
+## Admin User
 
-The `devices` table contains:
-
-```text
-id
-device_id
-device_name
-serial_number
-os_version
-ip_address
-location
-status
-last_seen
-last_online_at
-last_offline_at
-created_at
-updated_at
-```
-
-Allowed device statuses:
-
-```text
-ONLINE
-OFFLINE
-```
-
-Verify:
-
-```sql
-\dt
-
-SELECT * FROM devices;
-
-SELECT id, username, role FROM users;
-```
-
-# 7. Admin User
-
-Create the initial admin:
+For development, create the initial admin account with:
 
 ```powershell
 cd backend
 go run ./cmd/seed-admin
 ```
 
-Default development credentials:
-
-```text
-Username: admin
-Password: admin123
-```
-
-The password is stored using bcrypt.
-
-> Do not use the example credentials or JWT secret in production.
-
-# 8. Run the Application
-
-## Backend
-
-Start PostgreSQL first, then:
-
-```powershell
-cd backend
-go run ./cmd/server
-```
-
-Backend:
-
-```text
-http://localhost:8080
-```
-
-Health check:
-
-```text
-GET http://localhost:8080/health
-```
-
-## Frontend
-
-```powershell
-cd frontend
-npm run dev
-```
-
-Open:
-
-```text
-http://localhost:3000
-```
-
-Login with:
-
-```text
-Username: admin
-Password: admin123
-```
+Use the credentials configured through environment variables. Do not use development credentials in production.
 
 ## Simulator
-
-```powershell
-cd simulator
-go run .
-```
-
-The simulator automatically:
-
-1. Logs in using the admin account.
-2. Checks whether each device already exists.
-3. Registers missing devices.
-4. Starts heartbeat for all devices.
-
----
-
-# 9. Simulator
 
 The simulator represents five devices:
 
@@ -554,157 +297,45 @@ DMS-004  Warehouse PC 001
 DMS-005  IT Administrator PC
 ```
 
-Device information:
+On startup it authenticates, checks whether the devices already exist, registers missing devices, and starts the heartbeat loop.
 
-```text
-  DMS-001
-  Serial:  SN-DMS-001
-  OS:      Windows 11 Pro
-  IP:      192.168.1.101
-  Location: Office - Floor 1
-
-  DMS-002
-  Serial:  SN-DMS-002
-  OS:      Windows 11 Pro
-  IP:      192.168.1.102
-  Location: Office - Floor 2
-
-  DMS-003
-  Serial:  SN-DMS-003
-  OS:      Windows 10 Pro
-  IP:      192.168.1.103
-  Location: Office - Floor 3
-
-  DMS-004
-  Serial:  SN-DMS-004
-  OS:      Windows 11 Pro
-  IP:      192.168.1.104
-  Location: Warehouse
-
-  DMS-005
-  Serial:  SN-DMS-005
-  OS:      Windows 11 Pro
-  IP:      192.168.1.105
-  Location: IT Room
-```
-
-## Registration
-
-The simulator first authenticates:
-
-```http
-POST /api/v1/auth/login
-```
-
-It receives a JWT and uses it for device management requests.
-
-For every device:
-
-```text
-GET /api/v1/devices/{device_id}
-        |
-        +-- 200 → already exists → skip
-        |
-        +-- 404 → POST /api/v1/devices
-```
-
-This makes the simulator safe to restart without creating duplicate
-device records.
-
-## Heartbeat
-
-After registration, every simulated device sends:
-
-```http
-POST /api/v1/devices/{device_id}/heartbeat
-```
-
-The heartbeat is sent immediately and then every:
+Heartbeat interval:
 
 ```text
 10 seconds
 ```
 
-Stop the simulator with:
+Stop the simulator with `Ctrl + C`. After heartbeats stop, the backend will eventually mark the devices as `OFFLINE`.
+
+## Device Status
 
 ```text
-Ctrl + C
+                  heartbeat
+OFFLINE ─────────────────────────► ONLINE
+   ▲                                  │
+   │                                  │
+   └──── no heartbeat for > 30s ──────┘
 ```
 
-When heartbeat stops, the backend eventually changes the devices to
-`OFFLINE`.
-
-# 10. Device Status & Realtime
-
-## Heartbeat
-
-When a heartbeat is received:
-
-```text
-status    = ONLINE
-last_seen = NOW()
-```
-
-A normal heartbeat:
-
-```text
-ONLINE → ONLINE
-```
-
-does not generate a notification.
-
-If the previous state was `OFFLINE`:
-
-```text
-OFFLINE → ONLINE
-```
-
-a status-change event is generated.
-
-## Offline Detection
-
-The backend runs a background status monitor every:
-
-```text
-5 seconds
-```
-
-A device becomes `OFFLINE` when:
+The status monitor runs every 5 seconds. The device is considered offline when:
 
 ```text
 current_time - last_seen > 30 seconds
 ```
 
-The monitor checks the database because a disconnected device cannot report
-its own offline state.
-
-```text
-OFFLINE
-   |
-   | heartbeat
-   v
-ONLINE
-   |
-   | no heartbeat > 30s
-   v
-OFFLINE
-```
+A normal heartbeat that keeps an already-online device online does not create a status-change notification.
 
 ## WebSocket
 
-Endpoint:
+WebSocket endpoint:
 
 ```text
 ws://localhost:8080/api/v1/ws
 ```
 
-Event:
+Status events use the `DEVICE_STATUS_CHANGED` event type.
 
-```text
-DEVICE_STATUS_CHANGED
-```
-
-Example:
+Example payload:
 
 ```json
 {
@@ -719,21 +350,9 @@ Example:
 }
 ```
 
-The dashboard uses the event to:
+The dashboard uses these events to update device state and monitoring statistics in realtime.
 
-1. Update the affected device.
-2. Update dashboard statistics.
-3. Display a notification.
-4. Keep the WebSocket connection open.
-5. Reconnect after a disconnection.
-
-Reconnect delay:
-
-```text
-3 seconds
-```
-
-# 11. API Reference
+## API Reference
 
 Base URL:
 
@@ -741,32 +360,15 @@ Base URL:
 http://localhost:8080/api/v1
 ```
 
-## Authentication
+### Authentication
 
 ```http
 POST /auth/login
 ```
 
-Request:
-
-```json
-{
-  "username": "admin",
-  "password": "admin123"
-}
-```
-
-## Device Management
-
-Protected by:
+### Device Management
 
 ```http
-Authorization: Bearer <JWT>
-```
-
-Endpoints:
-
-```text
 POST   /devices
 GET    /devices
 GET    /devices/:device_id
@@ -774,379 +376,48 @@ PUT    /devices/:device_id
 DELETE /devices/:device_id
 ```
 
-Only `OFFLINE` devices can be deleted.
+Protected endpoints require:
 
-## Heartbeat
+```http
+Authorization: Bearer <JWT>
+```
+
+### Heartbeat
 
 ```http
 POST /devices/:device_id/heartbeat
 ```
 
-Example:
-
-```json
-{
-  "ip_address": "192.168.1.101"
-}
-```
-
-## Reports
+### Reports
 
 ```http
 GET /reports/summary
 GET /reports/devices/export
 ```
 
-Both report endpoints require admin authentication.
+The report endpoints provide monitoring statistics and CSV export functionality.
 
-# 12. Reports & CSV Export
+## Demo
 
-## Report Summary
-
-The report contains:
+A video demonstration is available here:
 
 ```text
-Total Devices
-Online Devices
-Offline Devices
-Last Online
-Last Offline
+https://shorturl.at/7wM7z
 ```
 
-Endpoint:
+## Security Notes
 
-```http
-GET /api/v1/reports/summary
-```
+- Environment-specific configuration must stay outside version control.
+- JWT secrets must be replaced for each environment.
+- Development credentials are examples only.
+- If a secret has previously been committed, rotate it and remove the secret from repository history where appropriate.
 
-The frontend displays timestamps using:
+## Current Status
 
-```text
-Asia/Jakarta
-```
+This repository is a portfolio/demo project focused on realtime device monitoring and backend engineering practices.
 
-## CSV Export
+Planned improvements include automated tests, CI checks, and additional observability.
 
-Endpoint:
+## License
 
-```http
-GET /api/v1/reports/devices/export
-```
-
-Authentication:
-
-```http
-Authorization: Bearer <JWT>
-```
-
-CSV columns:
-
-```text
-ID
-Device ID
-Device Name
-Serial Number
-OS Version
-IP Address
-Location
-Status
-Last Seen
-Last Online
-Last Offline
-Created At
-Updated At
-```
-
-Timestamps are formatted for readability, for example:
-
-```text
-2026-09-03 21:30:25
-```
-
-# 13. Docker Deployment
-
-The Docker Compose stack contains:
-
-```text
-PostgreSQL
-Backend
-Frontend
-Simulator
-```
-
-Start:
-
-```powershell
-docker compose up -d --build
-```
-
-Check:
-
-```powershell
-docker compose ps
-```
-
-Logs:
-
-```powershell
-docker compose logs -f
-docker compose logs -f backend
-docker compose logs -f frontend
-docker compose logs -f simulator
-```
-
-Stop:
-
-```powershell
-docker compose down
-```
-
-Restart:
-
-```powershell
-docker compose restart
-```
-
-PostgreSQL data is stored in:
-
-```text
-postgres_data
-```
-
-Avoid:
-
-```powershell
-docker compose down -v
-```
-
-unless you intentionally want to remove the PostgreSQL data.
-
-### Docker addresses
-
-```text
-Backend → PostgreSQL
-postgres:5432
-
-Simulator → Backend
-backend:8080
-
-Browser → Backend
-localhost:8080
-
-Browser → WebSocket
-localhost:8080
-```
-
-### Common Docker Commands
-
-### Start services
-
-```powershell
-docker compose up -d
-```
-
-### Stop services
-
-```powershell
-docker compose down
-```
-
-### Rebuild after code or dependency changes
-
-```powershell
-docker compose up -d --build
-```
-
-### View all logs
-
-```powershell
-docker compose logs -f
-```
-
-### View backend logs
-
-```powershell
-docker compose logs -f backend
-```
-
-### View frontend logs
-
-```powershell
-docker compose logs -f frontend
-```
-
-### View simulator logs
-
-```powershell
-docker compose logs -f simulator
-```
-
-### Restart services
-
-```powershell
-docker compose restart
-```
-
-The rule is simple:
-
-> Docker service names are for container-to-container communication.
-> `localhost` is used by the host/browser through published ports.
-
-# 14. Troubleshooting
-
-## Backend cannot connect to PostgreSQL
-
-Check where the backend runs.
-
-Local backend:
-
-```env
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/dms?sslmode=disable
-```
-
-Docker backend:
-
-```env
-DATABASE_URL=postgres://postgres:postgres@postgres:5432/dms?sslmode=disable
-```
-
-## Frontend CORS error
-
-Backend:
-
-```env
-CORS_ORIGIN=http://localhost:3000
-```
-
-Frontend:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
-```
-
-Restart the backend and Next.js after changing environment variables.
-
-## Login returns 401
-
-Verify the admin:
-
-```sql
-SELECT id, username, role
-FROM users
-WHERE username = 'admin';
-```
-
-If necessary:
-
-```powershell
-cd backend
-go run ./cmd/seed-admin
-```
-
-## Dashboard has no realtime updates
-
-Verify:
-
-```text
-ws://localhost:8080/api/v1/ws
-```
-
-Check the browser console and backend logs.
-
-The dashboard must connect to WebSocket when mounted.
-
-## Devices remain OFFLINE
-
-Run the simulator:
-
-```powershell
-cd simulator
-go run .
-```
-
-Check:
-
-```sql
-SELECT
-    device_id,
-    status,
-    last_seen
-FROM devices
-ORDER BY device_id;
-```
-
-## Devices do not become OFFLINE
-
-Verify:
-
-```env
-HEARTBEAT_TIMEOUT=30s
-STATUS_CHECK_INTERVAL=5s
-```
-
-Stop the simulator and wait approximately 30–35 seconds.
-
-## Docker simulator cannot connect to backend
-
-For a local simulator:
-
-```env
-DMS_API_URL=http://localhost:8080/api/v1
-```
-
-For a Docker simulator:
-
-```env
-DMS_API_URL=http://backend:8080/api/v1
-```
-
-Check:
-
-```powershell
-docker compose ps backend
-docker compose logs simulator
-```
-
-## Docker frontend cannot connect to backend
-
-Browser-side configuration must remain:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
-NEXT_PUBLIC_WS_URL=ws://localhost:8080/api/v1/ws
-```
-
-Do not use `backend:8080` in `NEXT_PUBLIC_*`.
-
-## CSV export returns 401
-
-Make sure the request contains:
-
-```http
-Authorization: Bearer <JWT>
-```
-
-The JWT must have the `ADMIN` role.
-
-## PostgreSQL data disappeared
-
-Check Docker volumes:
-
-```powershell
-docker volume ls
-```
-
-Avoid:
-
-```powershell
-docker compose down -v
-```
-
-because `-v` removes the PostgreSQL volume.
-
----
-
-# License
-
-This project is intended as a simple Device Management System project for
-development, learning, testing, and demonstration purposes.
+No license has currently been declared for this repository.
