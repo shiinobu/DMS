@@ -416,8 +416,11 @@ https://shorturl.at/7wM7z
 
 This repository is a portfolio/demo project focused on realtime device monitoring and backend engineering practices.
 
-Planned improvements include automated tests, CI checks, and additional observability.
+- Automated backend unit tests are included for authentication and configuration behavior.
+- GitHub Actions validates backend tests, `go vet`, and the frontend production build on pushes and pull requests to `main`.
+- Docker Compose provides a reproducible local stack for PostgreSQL, backend, frontend, and simulator.
+- Screenshots can be added later to make the portfolio presentation more visual.
 
 ## License
 
-No license has currently been declared for this repository.
+This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
